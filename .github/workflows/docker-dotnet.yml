@@ -1,0 +1,47 @@
+name: .NET Core Web API - CI/CD with Docker
+
+on:
+  push:
+    branches: ["timesheet_demo"]   # Run pipeline when pushing to main
+  pull_request:
+    branches: ["timesheet_demo"]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore TimeSheet/TimeSheet.csproj
+
+      - name: Build
+        run: dotnet build TimeSheet/TimeSheet.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --no-restore --verbosity normal
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/myapi:${{ github.sha }} -t ${{ secrets.DOCKER_USERNAME }}/myapi:latest .
+
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/myapi --all-tags
